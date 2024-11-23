@@ -2,25 +2,32 @@
 
 Esta píldora explica paso a paso cómo gestionar y renderizar animaciones basadas en hojas de sprites en Jetpack Compose, utilizando un `ViewModel` para manejar el estado y composables para renderizar las animaciones.
 
+![alt text](animation1.gif)
+
+
 - [Cómo trabajar con animaciones de sprites en Jetpack Compose :video\_game:](#cómo-trabajar-con-animaciones-de-sprites-en-jetpack-compose-video_game)
   - [¿Qué es una hoja de sprites?](#qué-es-una-hoja-de-sprites)
-  - [](#)
   - [Arquitectura general del código :gear:](#arquitectura-general-del-código-gear)
   - [Detalle de los componentes](#detalle-de-los-componentes)
-      - [**Puntos clave del código**:](#puntos-clave-del-código)
     - [`SpriteAnimationFromSheet`: Renderizado del fotograma](#spriteanimationfromsheet-renderizado-del-fotograma)
     - [`AnimationBox`: Contenedor visual de la animación](#animationbox-contenedor-visual-de-la-animación)
-    - [**`CharacterAnimation`: Ejemplo de uso**](#characteranimation-ejemplo-de-uso)
+- [**`CharacterAnimation`: Ejemplo de uso**](#characteranimation-ejemplo-de-uso)
   - [Resumen y mejores prácticas :memo:](#resumen-y-mejores-prácticas-memo)
-  - [Contacto](#contacto)
+  - [Referencias y Recursos](#referencias-y-recursos)
+
+
+
+
+*Si eres de los que prefieren ver el código directamente, aquí tienes el [código.](https://github.com/mikeldalmauc/android-particle-system/blob/main/app/src/main/java/com/example/animations/SpriteAnimations.kt)*
 
 ---
 
 ## ¿Qué es una hoja de sprites?
 
-Una hoja de sprites (sprite sheet) es una imagen que contiene múltiples fotogramas organizados en filas y columnas. Cada fila representa una animación (por ejemplo, caminar, saltar) y cada columna un fotograma de esa animación.
+Una hoja de sprites (sprite sheet) es una imagen que contiene múltiples fotogramas organizados en filas y columnas. Cada fila representa una animación (por ejemplo, caminar, saltar) y cada columna un fotograma de esa animación. 
 
 ![alt text](image.png)
+
 ---
 
 ## Arquitectura general del código :gear:
@@ -28,9 +35,11 @@ Una hoja de sprites (sprite sheet) es una imagen que contiene múltiples fotogra
 El sistema de animación está compuesto por los siguientes elementos:
 
 1. **`CharacterViewModel`**: Maneja el estado de la animación (nombre de la animación, fotograma actual, etc.).
-2. **`SpriteAnimationFromSheet`**: Composable que renderiza un fotograma específico desde la hoja de sprites.
-3. **`AnimationBox`**: Layout que contiene la animación y un selector para cambiar entre animaciones.
+2. **`Frame Mapper`**: Composable que renderiza un fotograma específico desde la hoja de sprites.
+3. **`Animation Selection`**: Layout que contiene la animación y un selector para cambiar entre animaciones.
 4. **Funciones específicas**: Ejemplos concretos para manejar personajes (`CharacterAnimation`) y zombis (`ZombiAnimation`).
+
+![alt text](image-1.png)
 
 ---
 
@@ -43,7 +52,9 @@ El `ViewModel` es el corazón de la lógica. Maneja:
 - El fotograma actual (`_currentFrame`).
 - El control del bucle de reproducción (`characterLoop`).
 
-#### **Puntos clave del código**:
+![alt text](image-2.png)
+
+**Puntos clave del código**:
 
 **Inicialización y ciclo de animaciones:**
 
@@ -72,33 +83,36 @@ private fun characterLoop() {
 
 **Cambio de animaciones:**
 
-El método `changeAnimation` permite cambiar dinámicamente entre animaciones.
+El método `changeAnimation` permite cambiar entre animaciones, aunque hay que espera a que termine la actual para que empieze la siguiente.
 
 ```kotlin
 fun changeAnimation(newAnimation: String) {
     _nextAnimation.value = newAnimation
 }
 ```
-*(Inserta un flujo visual mostrando cómo se pasa de una animación a otra, y cómo se actualizan los fotogramas.)*
 
 ---
 
 ### `SpriteAnimationFromSheet`: Renderizado del fotograma
 
 Este `Composable` extrae el fotograma actual desde la hoja de sprites y lo dibuja en pantalla. Los parámetros clave son:
-- `frameWidth` y `frameHeight`: Dimensiones del fotograma.
-- `row` y `currentFrame`: Indican qué fotograma extraer.
-- 
-**Cálculo de las coordenadas del fotograma:**
+- `frameWidth` y `frameHeight`: Dimensiones del fotograma. (p.e 64x64 bits)
+- `row`: Indica la fila o animación que esta en curso
+- `currentFrame`: Indican qué fotograma extraer.
+- `gap`: margen entre fotogramas
+- `yCorrection` y `xCorrection`: Si hay pixeles extra por arriba o por la izquierda, solo desplazan el fotograma a seleccionar por el valor indicado.
+
+Función de cálculo de las coordenadas del fotograma:
 
 ```kotlin
 val srcOffsetX = currentFrame * (frameWidth + gap) + xCorrection
 val srcOffsetY = row * (frameHeight + gap) + yCorrection
 ```
 
-Como se puede ver, a parte multiplicar el tamaño de los frames por las filas y columnas.
 
 **Renderizado en un `Canvas`:**
+
+Con las coordenadas calculadas y el tamaño del fotograma, seleccionamos la región de la hoja de sprites y la dibujamos en el `Canvas` apliando la imagen de salida por un factor de escala de nuestra elección.
 
 ```kotlin
 Canvas(modifier = Modifier.size(canvasX.dp, canvasY.dp)) {
@@ -112,7 +126,7 @@ Canvas(modifier = Modifier.size(canvasX.dp, canvasY.dp)) {
 }
 ```
 
-Por ejemplo, para extraer el fotograma 6 de la 4 fila usaríamos los parámetros siguientes:
+Por ejemplo, para extraer el fotograma 6 de la 4 fila usaríamos los parámetros siguientes para el sprite sheet de la imagen de arriba, hay que tener en cuenta que para otros spritesheets estos valores pueden variar y habría que ajustarlos.
 
 ```kotlin
 SpriteAnimationFromSheet(
@@ -121,7 +135,10 @@ SpriteAnimationFromSheet(
     frameWidth = 32,
     frameHeight = 32,
     row = 3,
-    currentFrame = 6
+    currentFrame = 6,
+    gap = 0,
+    yCorrection = 1,
+    xCorrection = 0
 )
 ```
 
@@ -180,7 +197,7 @@ Box(
 ---
 
 
-### **`CharacterAnimation`: Ejemplo de uso**
+# **`CharacterAnimation`: Ejemplo de uso**
 
 Este `Composable` utiliza el `ViewModel` para renderizar un personaje animado. Los datos del fotograma actual se extraen directamente desde el estado del `ViewModel`.
 
@@ -212,7 +229,13 @@ fun CharacterAnimation(characterController: CharacterViewModel) {
 2. **Control del tiempo**: Ajusta el `delay` en `playAnimation` para animaciones fluidas.
 3. **Modularidad**: Mantén el `ViewModel` independiente de la implementación visual para facilitar la reutilización.
 
-## Contacto
+## Referencias y Recursos
+
+- Código : [Sprite animation](https://github.com/mikeldalmauc/android-particle-system/blob/main/app/src/main/java/com/example/animations/SpriteAnimations.kt)
+- Diagrama: [Excalidraw](https://excalidraw.com)
+- Esquema : [Fuente Excalidraw](esquemapildoraanimacion_castellano.excalidraw)
+
+---
 
 Autor: [Mikel Dalmau](https://github.com/mikeldalmauc)  
 GitHub: [@mikeldalmauc](https://github.com/mikeldalmauc)
